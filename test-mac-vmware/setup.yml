@@ -13,7 +13,7 @@
         block: |
           192.168.56.11 loadbalancer
           192.168.56.12 webserver1
-          192.168.56.13 webserver3
+          192.168.56.13 webserver2
           192.168.56.14 appserver
 
     - name: Create devops user with password-protected sudo capability
@@ -46,11 +46,12 @@
         path: /etc/ssh/sshd_config
         regexp: "^PermitRootLogin"
         line: "PermitRootLogin no"
+      notify: Restart SSH
 
-    - name: Restart SSH
-      service:
-        name: ssh
-        state: restarted
+    - name: Set UFW default deny incoming
+      ufw:
+        default: deny
+        direction: incoming
 
     - name: Allow SSH
       ufw:
@@ -116,13 +117,41 @@
         path: /etc/ssh/sshd_config
         regexp: "^PasswordAuthentication"
         line: "PasswordAuthentication no"
+      notify: Restart SSH
 
     - name: Allow only devops user (and Vagrant for bootstrapping)
       lineinfile:
         path: /etc/ssh/sshd_config
+        regexp: "^AllowUsers"
         line: "AllowUsers devops vagrant"
+      notify: Restart SSH
 
     - name: Set secure umask
       lineinfile:
         path: /etc/profile
         line: "umask 027"
+
+    - name: Set secure umask in login.defs
+      lineinfile:
+        path: /etc/login.defs
+        regexp: "^UMASK"
+        line: "UMASK 027"
+
+    - name: Disable unused network interfaces
+      shell: ip link set {{ item }} down
+      loop:
+        - eth2
+      ignore_errors: yes
+
+    - name: Remove vagrant from AllowUsers to fully lock down SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^AllowUsers"
+        line: "AllowUsers devops"
+      notify: Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted
