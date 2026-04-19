@@ -91,11 +91,16 @@
         state: started
         enabled: yes
 
-    - name: Install Netdata via official script
-      shell: "curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-wait"
+    - name: Download Netdata kickstart script
+      shell: "curl -Ss https://get.netdata.cloud/kickstart.sh -o /tmp/netdata-kickstart.sh"
       args:
-        creates: /usr/sbin/netdata # If Netdata is already installed, skip this task
+        creates: /usr/sbin/netdata
 
+    - name: Install Netdata via kickstart script
+      shell: "bash /tmp/netdata-kickstart.sh --dont-wait"
+      args:
+        creates: /usr/sbin/netdata
+      
     - name: Install WireGuard
       apt:
         name: wireguard
@@ -105,6 +110,21 @@
       shell: "wg genkey | tee /etc/wireguard/private.key"
       args:
         creates: /etc/wireguard/private.key
+
+    - name: Generate WireGuard wg0 configuration
+      shell: |
+        echo "[Interface]" > /etc/wireguard/wg0.conf
+        echo "PrivateKey = $(cat /etc/wireguard/private.key)" >> /etc/wireguard/wg0.conf
+        echo "ListenPort = 51820" >> /etc/wireguard/wg0.conf
+        echo "Address = 10.8.0.{{ ansible_host.split('.')[-1] }}/24" >> /etc/wireguard/wg0.conf
+      args:
+        creates: /etc/wireguard/wg0.conf
+
+    - name: Start and enable WireGuard interface wg0
+      service:
+        name: wg-quick@wg0
+        state: started
+        enabled: yes
 
     - name: Allow WireGuard port on UFW
       ufw:
@@ -137,11 +157,14 @@
         regexp: "^UMASK"
         line: "UMASK 027"
 
-    - name: Disable unused network interfaces
-      shell: ip link set {{ item }} down
-      loop:
-        - eth2
-      ignore_errors: yes
+    - name: Verify no unused network interfaces exist
+      shell: ip link show
+      register: network_interfaces
+      changed_when: false
+
+    - name: Display network interfaces for audit
+      debug:
+        var: network_interfaces.stdout_lines
 
     - name: Remove vagrant from AllowUsers to fully lock down SSH
       lineinfile:
