@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Server Sorcery 101</h1>
-  <p><strong>Chapter 1 of A - A scrub nurse running on cloud. A foundational DevOps journey into Infrastructure as Code, Linux Administration, and Server Security.</strong></p>
+  <p><strong>Chapter 1 of 8 - A scrub nurse running on cloud. A foundational DevOps journey into Infrastructure as Code, Linux Administration, and Server Security.</strong></p>
 </div>
 
 ---
@@ -11,6 +11,62 @@ bare virtual machines and ending with a fully cloud-native,
 GitOps-managed deployment on a public cloud provider (which hopefully we will see in chapter 8, the final project). The mission is to take a rudimentary network design (an application server, two web servers, and a load balancer) and bring it to life natively via **Infrastructure as Code (IaC)**.
 
 This repository features a fully automated VM cluster configured from the ground up for strict networking, rigid security bounds, and reliable reproducibility.
+
+### System Architecture Diagram
+
+                         INTERNET
+                            │
+                       HTTP :80
+                            │
+                 ┌──────────▼──────────┐
+                 │    HOST MACHINE     │
+                 │  (macOS / VMware)   │
+                 │  port 8080 → :80    │
+                 └──────────┬──────────┘
+                            │
+        ╔═══════════════════▼════════════════════╗
+        ║     PRIVATE NETWORK 192.168.56.0/24    ║
+        ║         UFW: default deny incoming     ║
+        ║                                        ║
+        ║         ┌─────────────────┐            ║
+        ║         │  loadbalancer   │            ║
+        ║         │ 192.168.56.10   │            ║
+        ║         │ 2 vCPU · 1G RAM │            ║
+        ║         │ UFW: :80 :22    │            ║
+        ║         └────────┬────────┘            ║
+        ║                  │                     ║
+        ║         ┌────────┴────────┐            ║
+        ║         │                 │            ║
+        ║  ┌──────▼──────┐  ┌───────▼─────┐      ║
+        ║  │  webserver1 │  │  webserver2 │      ║
+        ║  │192.168.56.11│  │192.168.56.12│      ║
+        ║  │1 vCPU · 1G  │  │1 vCPU · 1G  │      ║
+        ║  │ UFW: :22    │  │ UFW: :22    │      ║
+        ║  └──────┬──────┘  └──────┬──────┘      ║
+        ║         │                │             ║
+        ║         └────────┬───────┘             ║
+        ║                  │                     ║
+        ║         ┌────────▼────────┐            ║
+        ║         │   appserver     │            ║
+        ║         │ 192.168.56.13   │            ║
+        ║         │ 1 vCPU · 2G RAM │            ║
+        ║         │ UFW: :22        │            ║
+        ║         └─────────────────┘            ║
+        ║                                        ║
+        ║  SSH :22 → devops user only            ║
+        ║  WireGuard VPN :51820/udp (all VMs)    ║
+        ╚════════════════════════════════════════╝
+
+**External zone**: only the host machine's port 8080 forwards into the private network, landing on the loadbalancer's port 80. Everything else is blocked at the host level.
+
+**Private network (192.168.56.0/24)**: all four VMs live here and can talk to each other. UFW on every VM defaults to deny incoming, with explicit allow rules only for SSH (:22) and WireGuard (:51820/udp).
+
+**Traffic flow**: internet traffic hits the loadbalancer, which distributes requests to webserver1 and webserver2. The web servers communicate with appserver for application logic. No external traffic can reach web servers or appserver directly.
+
+**Resource allocation**: loadbalancer gets 2 vCPUs (traffic distribution is CPU-bound), appserver gets 2G RAM (application logic is memory-bound), web servers stay lean at 1 vCPU/1G.
+
+**Security measures visible in the diagram**: SSH restricted to devops user only, WireGuard VPN on all nodes, UFW default deny, only loadbalancer externally accessible.
+
 
 ### Key Objectives
 - **VM Creation:** Spin up four servers natively.
