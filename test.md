@@ -422,7 +422,7 @@ between machines.
 
 How to "Test" Your Work (The Proof)
 
-To prove you aren't a fraud, you must verify. Here is how you test each bonus like a Senior SRE:
+To prove you aren't a fraud, you must verify. Here is how you test each bonus also:
 
 1. Testing Fail2Ban
 
@@ -442,6 +442,6 @@ The "Pro" Test: Run a heavy command on the server (like yes > /dev/null) and wat
 
 3. Testing WireGuard
 
-The Test: Run wg show on the server.
+The Test: Run sudo wg show on the server.
 
 The Result: It should show the interface wg0 (even if no one is connected yet). This proves the driver is active and listening.

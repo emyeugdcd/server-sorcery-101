@@ -63,6 +63,12 @@
         rule: allow
         port: 80
       when: inventory_hostname == 'loadbalancer'
+    
+    - name: Allow Netdata monitoring port
+      ufw:
+        rule: allow
+        port: 19999
+        proto: tcp
 
     - name: Enable firewall (default deny)
       ufw:
@@ -101,15 +107,40 @@
       args:
         creates: /usr/sbin/netdata
 
+    - name: Force Netdata to bind to all interfaces
+      blockinfile:
+        path: /etc/netdata/netdata.conf
+        create: yes
+        block: |
+          [web]
+              bind to = 0.0.0.0
+      notify: Restart Netdata
+
     - name: Install WireGuard
       apt:
         name: wireguard
         state: present
 
-    - name: Generate WireGuard Private Key
-      shell: "wg genkey | tee /etc/wireguard/private.key"
+    - name: Generate WireGuard public key
+      shell: "cat /etc/wireguard/private.key | wg pubkey | tee /etc/wireguard/public.key"
       args:
-        creates: /etc/wireguard/private.key
+        creates: /etc/wireguard/public.key
+
+    - name: Generate WireGuard wg0 configuration dynamically
+      shell: |
+        echo "[Interface]" > /etc/wireguard/wg0.conf
+        echo "PrivateKey = $(cat /etc/wireguard/private.key)" >> /etc/wireguard/wg0.conf
+        echo "ListenPort = 51820" >> /etc/wireguard/wg0.conf
+        echo "Address = 10.8.0.{{ ansible_host.split('.')[-1] }}/24" >> /etc/wireguard/wg0.conf
+        chmod 600 /etc/wireguard/wg0.conf
+      args:
+        creates: /etc/wireguard/wg0.conf
+
+    - name: Enable and start WireGuard interface
+      systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: started
 
     - name: Allow WireGuard port on UFW
       ufw:
@@ -159,4 +190,8 @@
     - name: Restart SSH
       service:
         name: ssh
+        state: restarted
+    - name: Restart Netdata
+      service:
+        name: netdata
         state: restarted
