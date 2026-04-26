@@ -30,7 +30,7 @@
         state: directory
         owner: devops
         group: devops
-        mode: '0700'
+        mode: "0700"
 
     - name: Copy Vagrant authorized keys to devops for passwordless SSH
       copy:
@@ -39,7 +39,7 @@
         dest: /home/devops/.ssh/authorized_keys
         owner: devops
         group: devops
-        mode: '0600'
+        mode: "0600"
 
     - name: Disable root SSH login
       lineinfile:
@@ -63,6 +63,18 @@
         rule: allow
         port: 80
       when: inventory_hostname == 'loadbalancer'
+
+    - name: Allow Netdata port
+      ufw:
+        rule: allow
+        port: 19999
+        proto: tcp
+
+    - name: Allow WireGuard port
+      ufw:
+        rule: allow
+        port: 51820
+        proto: udp
 
     - name: Enable firewall (default deny)
       ufw:
@@ -100,7 +112,7 @@
       shell: "bash /tmp/netdata-kickstart.sh --dont-wait"
       args:
         creates: /usr/sbin/netdata
-      
+
     - name: Install WireGuard
       apt:
         name: wireguard
@@ -125,12 +137,6 @@
         name: wg-quick@wg0
         state: started
         enabled: yes
-
-    - name: Allow WireGuard port on UFW
-      ufw:
-        rule: allow
-        port: 51820
-        proto: udp
 
     - name: Disable password authentication
       lineinfile:

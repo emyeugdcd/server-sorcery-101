@@ -38,6 +38,8 @@ vagrant destroy -f
 then run `vagrant up` again
 
 This is actually the correct workflow, you always run the playbook against fresh VMs, not ones that were already hardened by a previous run.
+Or you can also try running `ansible-playbook -i inventory.ini setup.yml -e "ansible_user=devops"`
+
 ---
 
 ## Phase 3: Requirement Validation
@@ -365,9 +367,9 @@ This is a **professional-style validation checklist**.
 
 | Test              | Command                                | Expected        |
 | ----------------- | -------------------------------------- | --------------- |
-| hostname correct  | `hostname`                             | loadbalancer         |
+| hostname correct  | `hostname`                             | loadbalancer    |
 | static IP         | `ip a`                                 | correct address |
-| network works     | `ping webserver1`                         | replies         |
+| network works     | `ping webserver1`                      | replies         |
 | SSH active        | `systemctl status ssh`                 | running         |
 | root SSH disabled | `grep PermitRootLogin`                 | no              |
 | firewall active   | `ufw status`                           | active          |
@@ -418,15 +420,11 @@ ssh devops@appserver
 between machines.
 
 ---
-
-
-How to "Test" Your Work (The Proof)
-
-To prove you aren't a fraud, you must verify. Here is how you test each bonus also:
+Here is how you test each bonus also:
 
 1. Testing Fail2Ban
 
-The Test: Try to log into one of your VMs via SSH with a wrong password 5 times in a row from your laptop.
+The Test: Try to log into one of your VMs via SSH with a wrong password 5 times in a row from your laptop using for example `ssh devops@192.168.56.11`
 
 The Result: On the 6th try, the server should "ghost" you (Connection refused).
 
@@ -442,6 +440,15 @@ The "Pro" Test: Run a heavy command on the server (like yes > /dev/null) and wat
 
 3. Testing WireGuard
 
-The Test: Run sudo wg show on the server.
+The Test: Run `sudo wg show` on the webserver1.
 
 The Result: It should show the interface wg0 (even if no one is connected yet). This proves the driver is active and listening.
+
+Quick health check for all VMs:
+```
+vagrant status                    # confirm all 4 VMs show "running"
+ping 192.168.56.12                # confirm inter-VM networking works
+ssh -i .vagrant/machines/loadbalancer/vmware_desktop/private_key devops@192.168.56.11
+sudo ufw status verbose           # confirm firewall is still active
+sudo systemctl status netdata     # confirm monitoring is running
+```
